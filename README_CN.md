@@ -322,6 +322,53 @@ Claude Code  ->  Anthropic API 请求
 
 将 XML 工具指令注入系统提示。模型输出 `<tool_code>` XML 标签。适用于没有原生 function calling 支持的本地模型。
 
+## 日志输出说明
+
+适配器使用结构化日志，典型格式如下：
+
+```text
+16:37:16 INF [xwD1Hd7R] → minimaxai/minimax-m2.1 (mode=stream, tools=native)
+```
+
+- `16:37:16`：时间戳
+- `INF`：日志级别（`DBG`/`INF`/`WRN`/`ERR`）
+- `[xwD1Hd7R]`：请求短 ID（可用于串联同一请求的日志）
+- `→ minimaxai/minimax-m2.1`：本次请求目标模型
+- `(mode=..., tools=...)`：关键元信息
+
+### 常见日志含义
+
+- `→ <model> (mode=stream|sync, tools=native|xml)`
+  - 请求已进入适配器处理流程。
+- `↩ stream ready <model> (setup_ms=..., tools=...)`
+  - 上游流建连成功；`setup_ms` 为建连耗时。
+- `Upstream connection is taking longer than expected (...)`
+  - 建连超过阈值（默认 15 秒）的告警，仅提醒，不会立即中断。
+- `Stream start failed, retrying (...)`
+  - 流开始阶段失败，适配器正在自动重试（由 `STREAM_START_RETRIES` 控制）。
+- `Stream interrupted, ending gracefully (...)`
+  - 流中途断开（网络或上游问题），适配器正在优雅收尾当前轮次。
+- `Recovered stream-start error with graceful SSE end (...)`
+  - 流启动失败后，适配器返回可恢复的 SSE 收尾，而不是直接 500。
+- `Truncated messages to fit context window (...)`
+  - 对话历史超出上下文窗口，触发裁剪。
+- `Context budgeting summary (...)`
+  - 上下文预算明细（裁剪前后消息数/token、可用 completion token、最终 max_tokens）。
+- `Dropped orphan tool messages after truncation (...)`
+  - 裁剪后清理了“失配的 tool 消息”，防止上游报 400。
+- `Streaming error: ... Message has tool role, but there was no previous assistant message ...`
+  - 上游拒绝了消息序列一致性（通常是 tool_call 配对不合法）。
+
+### 自动继续提示（流中断时）
+
+当上游流中断且属于可恢复场景时，适配器会返回提示文本并以 `end_turn` 收尾，例如：
+
+```text
+Notice: Upstream stream was interrupted. This turn ended safely. Please continue with your next message.
+```
+
+这可以避免会话硬崩，但当前轮次会结束；你可以直接继续下一条消息。
+
 ## 故障排除
 
 ### 端口被占用
@@ -346,6 +393,26 @@ claude-adapter-py -p 8080
 ```bash
 claude-adapter-py -r
 ```
+
+### 运行参数调优（可选）
+
+可通过环境变量调整流式鲁棒性与告警行为：
+
+```bash
+# 上游建连超过阈值时输出警告（秒）
+export CONNECT_WARNING_SECONDS=15
+
+# 流启动阶段可恢复错误的自动重试次数
+export STREAM_START_RETRIES=1
+```
+
+- `CONNECT_WARNING_SECONDS`
+  - 默认：`15`
+  - 设为 `0` 可关闭“建连过慢”告警日志。
+- `STREAM_START_RETRIES`
+  - 默认：`1`
+  - 仅对可恢复的流启动失败生效。
+  - 401/402/403/404/429 这类不可恢复错误不会重试。
 
 ### 模型找不到
 

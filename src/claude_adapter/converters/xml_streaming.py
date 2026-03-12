@@ -242,10 +242,12 @@ async def convert_xml_stream_to_anthropic(
                 error = chunk["error"]
                 if isinstance(error, dict) and ("message" in error or "type" in error):
                     error_msg = error.get("message", "Unknown error")
+                    error_type = error.get("type")
+                    prefix = "Notice: " if error_type == "recoverable_stream_interrupt" else "Error: "
                     if not state.has_started:
                         yield _message_start_event(state)
                         state.has_started = True
-                    for ev in _emit_text_block(f"Error: {error_msg}", state):
+                    for ev in _emit_text_block(f"{prefix}{error_msg}", state):
                         yield ev
                     for ev in _graceful_end_events(state):
                         yield ev

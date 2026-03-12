@@ -164,6 +164,39 @@ def _truncate_messages_to_fit(
     return system_msgs + kept
 
 
+def _sanitize_tool_message_sequence(messages: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Drop orphan tool-role messages that no longer have matching assistant tool_calls."""
+    sanitized: list[dict[str, Any]] = []
+    available_tool_ids: set[str] = set()
+    dropped = 0
+
+    for msg in messages:
+        role = msg.get("role")
+        if role == "assistant":
+            tool_calls = msg.get("tool_calls")
+            if isinstance(tool_calls, list):
+                for tc in tool_calls:
+                    if isinstance(tc, dict):
+                        tc_id = tc.get("id")
+                        if isinstance(tc_id, str) and tc_id:
+                            available_tool_ids.add(tc_id)
+            sanitized.append(msg)
+            continue
+
+        if role == "tool":
+            tool_call_id = msg.get("tool_call_id")
+            if isinstance(tool_call_id, str) and tool_call_id in available_tool_ids:
+                sanitized.append(msg)
+                available_tool_ids.discard(tool_call_id)
+            else:
+                dropped += 1
+            continue
+
+        sanitized.append(msg)
+
+    return sanitized, dropped
+
+
 def _resolve_effective_context_window(
     config: Optional[AdapterConfig],
     preset_max_context_window: Optional[int],
@@ -466,6 +499,13 @@ def convert_request_to_openai(
                     "final_max_tokens": max_tokens,
                 },
             )
+
+    messages, dropped_orphan_tools = _sanitize_tool_message_sequence(messages)
+    if dropped_orphan_tools > 0:
+        logger.warn(
+            "Dropped orphan tool messages after truncation",
+            {"count": dropped_orphan_tools, "model": target_model},
+        )
 
     max_tokens = max(1, max_tokens)
 

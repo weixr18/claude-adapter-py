@@ -31,6 +31,11 @@ _cached_client: Optional[AsyncOpenAI] = None
 _cached_client_key: Optional[tuple] = None
 _NON_RECOVERABLE_STREAM_START_STATUS = {401, 402, 403, 404, 429}
 _CONNECT_WARNING_SECONDS = float(os.getenv("CONNECT_WARNING_SECONDS", "15")) ## 连接警告秒数
+_STREAM_START_RETRIES = int(os.getenv("STREAM_START_RETRIES", "1"))
+_RECOVERABLE_STREAM_HINT = (
+    "Upstream stream was interrupted. This turn ended safely. "
+    "Please continue with your next message."
+)
 
 
 def _generate_request_id() -> str:
@@ -87,6 +92,44 @@ async def _call_with_connect_warning(
     finally:
         if warning_task is not None and not warning_task.done():
             warning_task.cancel()
+
+
+async def _create_stream_with_retry(
+    client: AsyncOpenAI,
+    stream_request: dict[str, Any],
+    req_logger: Any,
+    target_model: str,
+    retries: int = _STREAM_START_RETRIES,
+) -> Any:
+    """Retry stream-start on recoverable errors."""
+    for attempt in range(retries + 1):
+        try:
+            return await _call_with_connect_warning(
+                client.chat.completions.create(
+                    **stream_request,
+                    stream=True,
+                ),
+                req_logger,
+                target_model,
+                "stream",
+            )
+        except Exception as e:
+            status_code = _extract_status_code(e)
+            if status_code in _NON_RECOVERABLE_STREAM_START_STATUS or attempt >= retries:
+                raise
+            backoff_s = 0.6 * (attempt + 1)
+            req_logger.warn(
+                "Stream start failed, retrying",
+                {
+                    "attempt": attempt + 1,
+                    "max_retries": retries,
+                    "backoff_s": backoff_s,
+                    "model": target_model,
+                    "error": str(e)[:160],
+                },
+            )
+            await asyncio.sleep(backoff_s)
+    raise RuntimeError("stream start retry failed")
 
 
 def _get_openai_client(config: AdapterConfig) -> AsyncOpenAI:
@@ -351,14 +394,11 @@ async def handle_messages_request(
                 stream_request = {k: v for k, v in openai_request.items() if k != "stream"}
 
                 # Create OpenAI stream 创建 OpenAI 流
-                openai_stream = await _call_with_connect_warning(
-                    client.chat.completions.create(
-                        **stream_request,
-                        stream=True,
-                    ),
+                openai_stream = await _create_stream_with_retry(
+                    client,
+                    stream_request,
                     req_logger,
                     target_model,
-                    "stream",
                 )
 
                 # Convert to async iterator of SSE lines 转换为 SSE 行的异步迭代器
@@ -384,6 +424,13 @@ async def handle_messages_request(
                         req_logger.warn("Stream interrupted, ending gracefully", {
                             "error": str(e)[:200], "mode": "stream",
                         })
+                        error_data = {
+                            "error": {
+                                "type": "recoverable_stream_interrupt",
+                                "message": _RECOVERABLE_STREAM_HINT,
+                            }
+                        }
+                        yield f"data: {json.dumps(error_data)}\n\n"
                         yield "data: [DONE]\n\n"
 
                 # Choose stream converter based on tool format
@@ -430,12 +477,16 @@ async def handle_messages_request(
                         status_code=status_code or 500,
                         content=create_error_response(e, status_code or 500),
                     )
+                error_message = str(e)
 
                 async def failed_stream_line_iterator():
                     error_data = {
                         "error": {
-                            "type": "api_error",
-                            "message": str(e),
+                            "type": "recoverable_stream_interrupt",
+                            "message": (
+                                f"{_RECOVERABLE_STREAM_HINT} "
+                                f"(startup error: {error_message[:160]})"
+                            ),
                         }
                     }
                     yield f"data: {json.dumps(error_data)}\n\n"

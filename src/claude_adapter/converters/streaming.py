@@ -310,12 +310,14 @@ async def convert_stream_to_anthropic(
                 error = chunk_data["error"]
                 if isinstance(error, dict) and ("message" in error or "type" in error):
                     error_msg = error.get("message", "Unknown error")
+                    error_type = error.get("type")
+                    prefix = "Notice: " if error_type == "recoverable_stream_interrupt" else "Error: "
                     if not state.has_started:
                         yield _send_message_start(state)
                         state.has_started = True
                     idx = state.content_block_index
                     yield _send_content_block_start(idx, "text", "")
-                    yield _send_text_delta(idx, f"Error: {error_msg}")
+                    yield _send_text_delta(idx, f"{prefix}{error_msg}")
                     yield _send_content_block_stop(idx)
                     yield _format_sse({
                         "type": "message_delta",

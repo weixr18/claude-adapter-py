@@ -382,6 +382,53 @@ The adapter validates both structure and semantics at request entry. Validation 
 
 This fails because `tool_choice` is set but `tools` is missing.
 
+## Log Output Guide
+
+The adapter uses structured logs. Typical format:
+
+```text
+16:37:16 INF [xwD1Hd7R] → minimaxai/minimax-m2.1 (mode=stream, tools=native)
+```
+
+- `16:37:16`: timestamp
+- `INF`: level (`DBG`/`INF`/`WRN`/`ERR`)
+- `[xwD1Hd7R]`: short request ID (group lines for the same request)
+- `→ minimaxai/minimax-m2.1`: target model
+- `(mode=..., tools=...)`: request metadata
+
+### Common log lines and meanings
+
+- `→ <model> (mode=stream|sync, tools=native|xml)`
+  - Request entered adapter pipeline.
+- `↩ stream ready <model> (setup_ms=..., tools=...)`
+  - Upstream stream setup succeeded; `setup_ms` is connection/setup latency.
+- `Upstream connection is taking longer than expected (...)`
+  - Setup latency exceeded threshold (default 15s). Warning only; request keeps waiting.
+- `Stream start failed, retrying (...)`
+  - Stream startup failed and adapter is retrying (configured by `STREAM_START_RETRIES`).
+- `Stream interrupted, ending gracefully (...)`
+  - Mid-stream disconnection happened (network/upstream). Adapter is gracefully ending this turn.
+- `Recovered stream-start error with graceful SSE end (...)`
+  - Startup failed but adapter returned a recoverable Anthropic SSE end instead of hard 500.
+- `Truncated messages to fit context window (...)`
+  - Conversation history exceeded context window; truncation applied.
+- `Context budgeting summary (...)`
+  - Detailed budgeting metrics (before/after messages/tokens, available completion tokens, final max_tokens).
+- `Dropped orphan tool messages after truncation (...)`
+  - Removed invalid tool-role messages that lost their matching assistant tool_call after truncation.
+- `Streaming error: ... Message has tool role, but there was no previous assistant message ...`
+  - Upstream rejected message sequence consistency (usually tool-call pairing issue).
+
+### Auto-continue hint on interrupted streams
+
+When upstream stream interruption is recoverable, adapter now sends a safe hint text and closes the turn with `end_turn`, for example:
+
+```text
+Notice: Upstream stream was interrupted. This turn ended safely. Please continue with your next message.
+```
+
+This prevents hard crash, but the current turn still ends; continue by sending your next message.
+
 ## Troubleshooting
 
 ### Port already in use
@@ -407,6 +454,26 @@ claude-adapter-py -p 8080
 ```bash
 claude-adapter-py -r
 ```
+
+### Runtime tuning (optional)
+
+You can tune stream resilience and warning behavior with environment variables:
+
+```bash
+# Warn if upstream connection setup takes too long (seconds)
+export CONNECT_WARNING_SECONDS=15
+
+# Retry stream-start on recoverable startup failures
+export STREAM_START_RETRIES=1
+```
+
+- `CONNECT_WARNING_SECONDS`
+  - Default: `15`
+  - Set `0` to disable connection-latency warning logs.
+- `STREAM_START_RETRIES`
+  - Default: `1`
+  - Applies to recoverable stream-start failures only.
+  - Non-recoverable errors (401/402/403/404/429) are not retried.
 
 ### Model not found
 
