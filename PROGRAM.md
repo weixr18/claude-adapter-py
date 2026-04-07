@@ -9,7 +9,7 @@
 - 支持三类接入模式：
   - 免费云端：`NVIDIA NIM`
   - 免费本地：`Ollama`、`LM Studio`
-  - 付费直连（不启本地代理服务）：`Kimi`、`DeepSeek`、`GLM`、`MiniMax`
+  - 付费直连（不启本地代理服务）：`Kimi`、`DeepSeek`、`GLM`、`MiniMax`、`火山引擎 ARK`
 
 结论：项目方向和实现路径与目标一致，具备可运行的端到端能力。
 
@@ -121,7 +121,7 @@
    - stream：`streaming.py` 或 `xml_streaming.py` 转 SSE
 10. 返回 Anthropic 格式给 Claude Code
 
-### 4.2 付费 provider（Kimi/DeepSeek/GLM/MiniMax）技术链
+### 4.2 付费 provider（Kimi/DeepSeek/GLM/MiniMax/火山引擎 ARK）技术链
 
 1. 用户执行 `claude-adapter-py`
 2. CLI 选择 paid provider

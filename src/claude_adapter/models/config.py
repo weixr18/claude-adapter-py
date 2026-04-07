@@ -17,6 +17,7 @@ ProviderName = Literal[
     "deepseek",
     "glm",
     "minimax",
+    "volcengine",
     "custom",
 ]
 

@@ -31,6 +31,7 @@ It translates Anthropic Messages API requests to OpenAI Chat Completions format,
 | **Paid** | DeepSeek | Cloud API | https://platform.deepseek.com |
 | **Paid** | GLM Z.ai | Cloud API | https://bigmodel.cn |
 | **Paid** | MiniMax | Cloud API | https://platform.minimaxi.com |
+| **Paid** | 火山引擎 ARK (CodingPlan) | Cloud API | https://ark.cn-beijing.volces.com/api/coding |
 | **Custom** | OpenAI-compatible | Any | Any OpenAI-compatible endpoint |
 
 ## Installation
@@ -60,7 +61,7 @@ The CLI starts with provider selection. You will see three categories plus navig
 ```
 ? Choose provider type 选择提供商类型:
   Free    NVIDIA, Ollama, LM Studio
-  Paid    Kimi, DeepSeek, GLM, MiniMax
+  Paid    Kimi, DeepSeek, GLM, MiniMax, 火山引擎 ARK
   Custom  OpenAI-compatible endpoint
   Go back  返回重新选择
   Exit  退出
@@ -216,6 +217,12 @@ lms server start
 1. Visit https://platform.minimaxi.com/user-center/basic-information/interface-key
 2. Sign up and create an API Key, format: `eyxxxx`
 3. Recommended model: `MiniMax-M2.1`
+
+### 火山引擎 ARK (CodingPlan)  Paid, Cloud
+
+1. Visit https://ark.cn-beijing.volces.com/api/coding
+2. Sign up and create an API Key
+3. Select the model you want to use
 
 ### Custom OpenAI-compatible
 

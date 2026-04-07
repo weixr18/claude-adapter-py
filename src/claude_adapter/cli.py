@@ -87,13 +87,19 @@ def _select_provider() -> Union[Optional[ProviderName], str]:
     ui.header("Select Provider 选择提供商")
 
     # ── Category selection 分类选择 ──
+    # Get provider names for each category for display
+    free_providers = get_providers_by_category("free")
+    paid_providers = get_providers_by_category("paid")
+    free_labels = ", ".join([p.label for p in free_providers])
+    paid_labels = ", ".join([p.label for p in paid_providers])
+
     category_choices = [
         questionary.Choice(
-            f"{CATEGORY_LABELS['free']}   NVIDIA, Ollama, LM Studio (需要启动 HTTP 服务器)",
+            f"{CATEGORY_LABELS['free']}   {free_labels} (需要启动 HTTP 服务器)",
             value="free",
         ),
         questionary.Choice(
-            f"{CATEGORY_LABELS['paid']}   Kimi, DeepSeek, GLM, MiniMax (直接 Anthropic API，无需服务器)",
+            f"{CATEGORY_LABELS['paid']}   {paid_labels} (直接 Anthropic API，无需服务器)",
             value="paid",
         ),
         questionary.Choice(
@@ -144,41 +150,87 @@ def _select_provider() -> Union[Optional[ProviderName], str]:
 #  Paid provider configuration  付费提供商配置
 # ═══════════════════════════════════════════════════════════
 
-def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset) -> bool:
+def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset, force_reconfig: bool = False) -> bool:
     """Configure a paid provider (direct Anthropic API, no HTTP server)
     配置付费提供商（直接 Anthropic API，无需 HTTP 服务器）
+
+    Args:
+        provider_name: Provider name 提供商名称
+        preset: Provider preset 提供商预设
+        force_reconfig: If True, skip cache check and force reconfigure
+                      如果为 True，跳过缓存检查并强制重新配置
 
     Returns:
         True if configured successfully, False if cancelled
     """
     ui.header(f"Configure {preset.label}")
 
-    # Check for cached config 检查缓存配置
-    cached = load_paid_provider_cache(provider_name)
-    if cached:
-        print()
-        ui.info("Found cached configuration 发现已缓存的配置")
-        choices = [
-            questionary.Choice("Use cached API Key  使用已缓存的 API Key", value="use"),
-            questionary.Choice("Reconfigure  重新配置", value="reconfig"),
-            questionary.Choice("Go back  返回", value=BACK),
-            questionary.Choice("Exit  退出", value=EXIT),
-        ]
-        action = questionary.select(
-            f"{preset.label} - 已缓存配置",
-            choices=choices,
-        ).ask()
+    # Check for cached config only if not forcing reconfigure
+    # 仅在非强制重新配置时检查缓存
+    api_key = None
+    opus_model = None
+    sonnet_model = None
+    haiku_model = None
 
-        if action == "use":
-            api_key = cached["api_key"]
-        elif action == "reconfig":
-            api_key = None
-        elif action == BACK:
-            return False
-        else:
-            sys.exit(0)
-    else:
-        api_key = None
+    if not force_reconfig:
+        cached = load_paid_provider_cache(provider_name)
+        if cached:
+            print()
+            ui.info("Found cached configuration 发现已缓存的配置")
+            choices = [
+                questionary.Choice("Use cached API Key  使用已缓存的 API Key", value="use"),
+                questionary.Choice("Reconfigure  重新配置", value="reconfig"),
+                questionary.Choice("Go back  返回", value=BACK),
+                questionary.Choice("Exit  退出", value=EXIT),
+            ]
+            action = questionary.select(
+                f"{preset.label} - 已缓存配置",
+                choices=choices,
+            ).ask()
+
+            if action == "use":
+                api_key = cached["api_key"]
+                # Ask whether to use cached model or enter new model
+                print()
+                cached_opus = cached.get("opus_model") or preset.default_models.opus
+                cached_sonnet = cached.get("sonnet_model") or preset.default_models.sonnet
+                cached_haiku = cached.get("haiku_model") or preset.default_models.haiku
+                ui.info(f"Cached models 缓存的模型:")
+                print(f"  Opus   -> {cached_opus}")
+                print(f"  Sonnet -> {cached_sonnet}")
+                print(f"  Haiku  -> {cached_haiku}")
+
+                model_choices = [
+                    questionary.Choice("Use cached models  使用缓存模型", value="use_cached"),
+                    questionary.Choice("Enter new models  输入新模型", value="enter_new"),
+                    questionary.Choice("Go back  返回", value=BACK),
+                ]
+                model_action = questionary.select(
+                    "Model  模型:",
+                    choices=model_choices,
+                ).ask()
+
+                if model_action == "use_cached":
+                    opus_model = cached_opus
+                    sonnet_model = cached_sonnet
+                    haiku_model = cached_haiku
+                elif model_action == "enter_new":
+                    opus_model = None  # Will trigger model input below
+                    sonnet_model = None
+                    haiku_model = None
+                elif model_action == BACK:
+                    return False
+                else:
+                    sys.exit(0)
+            elif action == "reconfig":
+                # Force reconfigure without checking cache
+                if not _configure_paid_provider(provider_name, preset, force_reconfig=True):
+                    return False
+                return True
+            elif action == BACK:
+                return False
+            else:
+                sys.exit(0)
 
     # Get API Key if not using cache 如果不使用缓存，获取 API Key
     if api_key is None:
@@ -191,13 +243,34 @@ def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset
             ui.warning("API Key is required")
             return False
 
-    # Configure and write to ~/.claude/settings.json
+    # Model mappings (like free providers)
+    # 模型映射（与免费提供商相同）
+    if opus_model is None:
+        print()
+        ui.info("Model mappings 模型映射, press Enter to use defaults 回车使用默认值:")
+
+        opus_model = questionary.text(
+            "  Claude Opus   -> ",
+            default=preset.default_models.opus,
+        ).ask() or preset.default_models.opus
+
+        sonnet_model = questionary.text(
+            "  Claude Sonnet -> ",
+            default=preset.default_models.sonnet,
+        ).ask() or preset.default_models.sonnet
+
+        haiku_model = questionary.text(
+            "  Claude Haiku  -> ",
+            default=preset.default_models.haiku,
+        ).ask() or preset.default_models.haiku
+
+    # Configure and write to ~/.claude/settings.json (use opus model as default)
     try:
         update_claude_json()
         update_claude_settings_for_paid_provider(
             provider_name=provider_name,
             api_key=api_key.strip(),
-            model_name=preset.default_models.opus,
+            model_name=opus_model,
             base_url=preset.base_url,
         )
     except Exception as e:
@@ -209,9 +282,9 @@ def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset
         save_paid_provider_to_cache(
             provider_name=provider_name,
             api_key=api_key.strip(),
-            opus_model=preset.default_models.opus,
-            sonnet_model=preset.default_models.sonnet,
-            haiku_model=preset.default_models.haiku,
+            opus_model=opus_model,
+            sonnet_model=sonnet_model,
+            haiku_model=haiku_model,
             base_url=preset.base_url,
         )
     except Exception as e:
@@ -525,17 +598,74 @@ def main(
                 ).ask()
 
                 if action == "use":
-                    # Use cached API key 使用缓存的 API Key
+                    # Ask whether to use cached model or enter new model
+                    print()
+                    cached_opus = cached.get("opus_model") or preset.default_models.opus
+                    cached_sonnet = cached.get("sonnet_model") or preset.default_models.sonnet
+                    cached_haiku = cached.get("haiku_model") or preset.default_models.haiku
+                    ui.info(f"Cached models 缓存的模型:")
+                    print(f"  Opus   -> {cached_opus}")
+                    print(f"  Sonnet -> {cached_sonnet}")
+                    print(f"  Haiku  -> {cached_haiku}")
+
+                    model_choices = [
+                        questionary.Choice("Use cached models  使用缓存模型", value="use_cached"),
+                        questionary.Choice("Enter new models  输入新模型", value="enter_new"),
+                        questionary.Choice("Go back  返回", value=BACK),
+                    ]
+                    model_action = questionary.select(
+                        "Model  模型:",
+                        choices=model_choices,
+                    ).ask()
+
+                    if model_action == "use_cached":
+                        selected_model = cached_opus
+                    elif model_action == "enter_new":
+                        print()
+                        ui.info("Model mappings 模型映射, press Enter to use defaults 回车使用默认值:")
+                        opus_model = questionary.text(
+                            "  Claude Opus   -> ",
+                            default=preset.default_models.opus,
+                        ).ask() or preset.default_models.opus
+                        sonnet_model = questionary.text(
+                            "  Claude Sonnet -> ",
+                            default=preset.default_models.sonnet,
+                        ).ask() or preset.default_models.sonnet
+                        haiku_model = questionary.text(
+                            "  Claude Haiku  -> ",
+                            default=preset.default_models.haiku,
+                        ).ask() or preset.default_models.haiku
+                        selected_model = opus_model
+
+                        # Save new models to cache
+                        try:
+                            save_paid_provider_to_cache(
+                                provider_name=provider_name_str,
+                                api_key=cached["api_key"],
+                                opus_model=opus_model,
+                                sonnet_model=sonnet_model,
+                                haiku_model=haiku_model,
+                                base_url=cached.get("base_url", preset.base_url),
+                            )
+                        except Exception:
+                            pass
+                    elif model_action == BACK:
+                        continue
+                    else:
+                        raise typer.Exit(0)
+
+                    # Apply config 应用配置
                     try:
                         update_claude_json()
                         update_claude_settings_for_paid_provider(
                             provider_name=provider_name_str,
                             api_key=cached["api_key"],
-                            model_name=preset.default_models.opus,
+                            model_name=selected_model,
                             base_url=cached.get("base_url", preset.base_url),
                         )
                         print()
                         ui.success(f"{preset.label} configured from cache!")
+                        ui.info(f"Model 模型: {selected_model}")
                         ui.info("无需启动 HTTP 服务器，直接使用 Claude Code 即可")
                     except Exception as e:
                         ui.error("Failed to save settings", str(e))

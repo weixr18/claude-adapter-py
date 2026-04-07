@@ -15,7 +15,7 @@ Claude Adapter Python 是一个本地 HTTP 代理服务器，让你能够在 [**
 通过将 Anthropic Messages API 请求转换为 OpenAI Chat Completions 格式，可以：
 
 - 使用任何 OpenAI 兼容 API 与 Claude Code 配合
-- 轻松切换不同的 AI 提供商（免费：NVIDIA、Ollama、LM Studio；付费：Kimi、DeepSeek、Z.ai、MiniMax；自定义端点）
+- 轻松切换不同的 AI 提供商（免费：NVIDIA、Ollama、LM Studio；付费：Kimi、DeepSeek、Z.ai、MiniMax、火山引擎 ARK；自定义端点）
 - 使用 Ollama 或 LM Studio 运行本地模型
 - 完整的工具调用支持，原生和 XML 两种模式
 - 流式响应，实时交互
@@ -31,6 +31,7 @@ Claude Adapter Python 是一个本地 HTTP 代理服务器，让你能够在 [**
 | **付费** | DeepSeek | 云端 API | https://platform.deepseek.com |
 | **付费** | GLM Z.ai | 云端 API | https://bigmodel.cn |
 | **付费** | MiniMax | 云端 API | https://platform.minimaxi.com |
+| **付费** | 火山引擎 ARK (CodingPlan) | 云端 API | https://ark.cn-beijing.volces.com/api/coding |
 | **自定义** | OpenAI-compatible | 任意 | 任意兼容 OpenAI 的端点 |
 
 ## 安装
@@ -60,7 +61,7 @@ claude-adapter-py
 ```
 ? Choose provider type 选择提供商类型:
   Free    NVIDIA, Ollama, LM Studio
-  Paid    Kimi, DeepSeek, GLM, MiniMax
+  Paid    Kimi, DeepSeek, GLM, MiniMax, 火山引擎 ARK
   Custom  OpenAI-compatible endpoint
   Go back  返回重新选择
   Exit  退出
@@ -223,6 +224,12 @@ lms server start
 1. 访问 https://platform.minimaxi.com/user-center/basic-information/interface-key
 2. 注册账号并创建 API Key，格式：`eyxxxx`
 3. 推荐模型：`MiniMax-M2.1`
+
+### 火山引擎 ARK (CodingPlan)  付费，云端
+
+1. 访问 https://ark.cn-beijing.volces.com/api/coding
+2. 注册账号并创建 API Key
+3. 选择要使用的模型
 
 ### 自定义 OpenAI-compatible
 

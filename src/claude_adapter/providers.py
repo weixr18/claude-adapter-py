@@ -16,17 +16,18 @@ ProviderCategory = Literal["free", "paid", "custom"]
 
 # Paid provider names for direct Anthropic configuration
 # 付费提供商名称（直接配置 Anthropic，无需启动 HTTP 服务器）
-PAID_PROVIDER_NAMES: tuple[Literal["kimi", "deepseek", "glm", "minimax"], ...] = (
+PAID_PROVIDER_NAMES: tuple[Literal["kimi", "deepseek", "glm", "minimax", "volcengine"], ...] = (
     "kimi",
     "deepseek",
     "glm",
     "minimax",
+    "volcengine",
 )
 
 # ─── Category definitions 分类定义 ───
 PROVIDER_CATEGORIES: dict[ProviderCategory, list[ProviderName]] = {
     "free": ["nvidia", "ollama", "lmstudio"],
-    "paid": ["kimi", "deepseek", "glm", "minimax"],
+    "paid": ["kimi", "deepseek", "glm", "minimax", "volcengine"],
     "custom": ["custom"],
 }
 
@@ -99,6 +100,13 @@ PROVIDER_GUIDANCE: dict[ProviderName, list[str]] = {
         "   1. 访问 https://platform.minimaxi.com/user-center/basic-information/interface-key",
         "   2. 注册账号并创建 API Key (格式: eyxxxx)",
         "   3. 推荐模型: MiniMax-M2.1",
+        "   4. 配置完成后直接使用 Claude Code，无需启动 HTTP 服务器",
+    ],
+    "volcengine": [
+        "火山引擎 ARK CodingPlan Anthropic 直接配置:",
+        "   1. 访问 https://ark.cn-beijing.volces.com/api/coding",
+        "   2. 注册账号并创建 API Key",
+        "   3. 选择要使用的模型",
         "   4. 配置完成后直接使用 Claude Code，无需启动 HTTP 服务器",
     ],
     "custom": [
@@ -213,6 +221,20 @@ PROVIDER_PRESETS: dict[ProviderName, ProviderPreset] = {
         ),
         default_tool_format="native",
         description="MiniMax API (https://platform.minimaxi.com/)",
+    ),
+    "volcengine": ProviderPreset(
+        name="volcengine",
+        label="火山引擎 ARK (CodingPlan)",
+        base_url="https://ark.cn-beijing.volces.com/api/coding",
+        api_key_required=True,
+        api_key_placeholder="ARK-xxxx",
+        default_models=ModelConfig(
+            opus="MiniMax-M2.5",
+            sonnet="MiniMax-M2.5",
+            haiku="MiniMax-M2.5",
+        ),
+        default_tool_format="native",
+        description="火山引擎 ARK CodingPlan (https://ark.cn-beijing.volces.com/api/coding)",
     ),
     "custom": ProviderPreset(
         name="custom",
