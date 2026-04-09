@@ -16,18 +16,19 @@ ProviderCategory = Literal["free", "paid", "custom"]
 
 # Paid provider names for direct Anthropic configuration
 # 付费提供商名称（直接配置 Anthropic，无需启动 HTTP 服务器）
-PAID_PROVIDER_NAMES: tuple[Literal["kimi", "deepseek", "glm", "minimax", "volcengine"], ...] = (
+PAID_PROVIDER_NAMES: tuple[Literal["kimi", "deepseek", "glm", "minimax", "volcengine", "bailian"], ...] = (
     "kimi",
     "deepseek",
     "glm",
     "minimax",
     "volcengine",
+    "bailian",
 )
 
 # ─── Category definitions 分类定义 ───
 PROVIDER_CATEGORIES: dict[ProviderCategory, list[ProviderName]] = {
     "free": ["nvidia", "ollama", "lmstudio"],
-    "paid": ["kimi", "deepseek", "glm", "minimax", "volcengine"],
+    "paid": ["kimi", "deepseek", "glm", "minimax", "volcengine", "bailian"],
     "custom": ["custom"],
 }
 
@@ -108,6 +109,17 @@ PROVIDER_GUIDANCE: dict[ProviderName, list[str]] = {
         "   2. 注册账号并创建 API Key",
         "   3. 选择要使用的模型",
         "   4. 配置完成后直接使用 Claude Code，无需启动 HTTP 服务器",
+    ],
+    "bailian": [
+        "阿里云百炼 Anthropic 直接配置:",
+        "   1. 访问 https://bailian.console.aliyun.com/ 开通百炼服务",
+        "   2. 在 https://bailian.console.aliyun.com/?apiKey=1#/api-key 创建 API Key",
+        "   3. 推荐模型:",
+        "      - qwen3.6-plus (复杂推理、代码生成)",
+        "      - qwen3.5-flash (快速响应、简单任务)",
+        "      - qwen3-coder-plus (代码专用)",
+        "   4. 配置完成后直接使用 Claude Code，无需启动 HTTP 服务器",
+        "   5. 详见文档: https://help.aliyun.com/zh/model-studio/claude-code",
     ],
     "custom": [
         "自定义 OpenAI-compatible 接口:",
@@ -235,6 +247,20 @@ PROVIDER_PRESETS: dict[ProviderName, ProviderPreset] = {
         ),
         default_tool_format="native",
         description="火山引擎 ARK CodingPlan (https://ark.cn-beijing.volces.com/api/coding)",
+    ),
+    "bailian": ProviderPreset(
+        name="bailian",
+        label="阿里云百炼 (Qwen)",
+        base_url="https://dashscope.aliyuncs.com/apps/anthropic",
+        api_key_required=True,
+        api_key_placeholder="sk-xxxx",
+        default_models=ModelConfig(
+            opus="qwen3.6-plus",
+            sonnet="qwen3.6-plus",
+            haiku="qwen3.5-flash",
+        ),
+        default_tool_format="native",
+        description="阿里云百炼 Qwen (https://bailian.console.aliyun.com)",
     ),
     "custom": ProviderPreset(
         name="custom",

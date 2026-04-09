@@ -15,7 +15,7 @@ Claude Adapter Python 是一个本地 HTTP 代理服务器，让你能够在 [**
 通过将 Anthropic Messages API 请求转换为 OpenAI Chat Completions 格式，可以：
 
 - 使用任何 OpenAI 兼容 API 与 Claude Code 配合
-- 轻松切换不同的 AI 提供商（免费：NVIDIA、Ollama、LM Studio；付费：Kimi、DeepSeek、Z.ai、MiniMax、火山引擎 ARK；自定义端点）
+- 轻松切换不同的 AI 提供商（免费：NVIDIA、Ollama、LM Studio；付费：Kimi、DeepSeek、Z.ai、MiniMax、火山引擎 ARK、阿里云百炼；自定义端点）
 - 使用 Ollama 或 LM Studio 运行本地模型
 - 完整的工具调用支持，原生和 XML 两种模式
 - 流式响应，实时交互
@@ -32,6 +32,7 @@ Claude Adapter Python 是一个本地 HTTP 代理服务器，让你能够在 [**
 | **付费** | GLM Z.ai | 云端 API | https://bigmodel.cn |
 | **付费** | MiniMax | 云端 API | https://platform.minimaxi.com |
 | **付费** | 火山引擎 ARK (CodingPlan) | 云端 API | https://ark.cn-beijing.volces.com/api/coding |
+| **付费** | 阿里云百炼 (Qwen) | 云端 API | https://bailian.console.aliyun.com |
 | **自定义** | OpenAI-compatible | 任意 | 任意兼容 OpenAI 的端点 |
 
 ## 安装
@@ -61,7 +62,7 @@ claude-adapter-py
 ```
 ? Choose provider type 选择提供商类型:
   Free    NVIDIA, Ollama, LM Studio
-  Paid    Kimi, DeepSeek, GLM, MiniMax, 火山引擎 ARK
+  Paid    Kimi, DeepSeek, GLM, MiniMax, 火山引擎 ARK, 阿里云百炼
   Custom  OpenAI-compatible endpoint
   Go back  返回重新选择
   Exit  退出
@@ -231,6 +232,16 @@ lms server start
 2. 注册账号并创建 API Key
 3. 选择要使用的模型
 
+### 阿里云百炼 (Qwen)  付费，云端
+
+1. 访问 https://bailian.console.aliyun.com/ 开通阿里云百炼服务
+2. 在 https://bailian.console.aliyun.com/?apiKey=1#/api-key 创建 API Key
+3. 推荐模型：
+   - `qwen3.6-plus` - 复杂推理、代码生成（对应 Claude Opus/Sonnet）
+   - `qwen3.5-flash` - 快速响应、简单任务（对应 Claude Haiku）
+   - `qwen3-coder-plus` - 代码专用模型
+4. 详细文档：https://help.aliyun.com/zh/model-studio/claude-code
+
 ### 自定义 OpenAI-compatible
 
 1. 准备好任意兼容 OpenAI API 的服务端点
@@ -323,7 +334,7 @@ Claude Code  ->  Anthropic API 请求
 
 ### 原生模式  推荐用于云端 API
 
-使用 OpenAI 原生 function calling。适用于 NVIDIA、Kimi、DeepSeek、GLM、MiniMax 等云端提供商。
+使用 OpenAI 原生 function calling。适用于 NVIDIA、Kimi、DeepSeek、GLM、MiniMax、阿里云百炼等云端提供商。
 
 ### XML 模式  推荐用于本地模型
 

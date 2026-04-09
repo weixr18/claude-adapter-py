@@ -32,6 +32,7 @@ It translates Anthropic Messages API requests to OpenAI Chat Completions format,
 | **Paid** | GLM Z.ai | Cloud API | https://bigmodel.cn |
 | **Paid** | MiniMax | Cloud API | https://platform.minimaxi.com |
 | **Paid** | 火山引擎 ARK (CodingPlan) | Cloud API | https://ark.cn-beijing.volces.com/api/coding |
+| **Paid** | 阿里云百炼 (Qwen) | Cloud API | https://bailian.console.aliyun.com |
 | **Custom** | OpenAI-compatible | Any | Any OpenAI-compatible endpoint |
 
 ## Installation
@@ -224,6 +225,16 @@ lms server start
 2. Sign up and create an API Key
 3. Select the model you want to use
 
+### 阿里云百炼 (Qwen)  Paid, Cloud
+
+1. Visit https://bailian.console.aliyun.com/ to activate Alibaba Cloud Bailian
+2. Create an API Key at https://bailian.console.aliyun.com/?apiKey=1#/api-key
+3. Recommended models:
+   - `qwen3.6-plus` - Complex reasoning, code generation
+   - `qwen3.5-flash` - Fast response, simple tasks
+   - `qwen3-coder-plus` - Code-specific tasks
+4. Documentation: https://help.aliyun.com/zh/model-studio/claude-code
+
 ### Custom OpenAI-compatible
 
 1. Prepare any OpenAI-compatible API endpoint
@@ -333,6 +344,7 @@ Injects XML tool instructions into the system prompt. Models output `<tool_code>
 | DeepSeek | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
 | GLM | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
 | MiniMax | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
+| 阿里云百炼 | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
 | Custom OpenAI-compatible | Depends on endpoint | Usually required for Claude Code integration | native/xml by model capability | endpoint-defined |
 
 ## Request Validation Rules (`/v1/messages`)

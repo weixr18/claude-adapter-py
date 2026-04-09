@@ -18,6 +18,7 @@ ProviderName = Literal[
     "glm",
     "minimax",
     "volcengine",
+    "bailian",
     "custom",
 ]
 
