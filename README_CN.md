@@ -340,6 +340,21 @@ Claude Code  ->  Anthropic API 请求
 
 将 XML 工具指令注入系统提示。模型输出 `<tool_code>` XML 标签。适用于没有原生 function calling 支持的本地模型。
 
+## 提供商能力矩阵
+
+| 提供商 | 启动方式 | 本地代理服务器 | 推荐工具模式 | 默认上下文窗口 |
+|---|---|---|---|---|
+| NVIDIA NIM | 云端 | 需要 | native | 128k |
+| Ollama | 本地/云端 | 需要 | native（较弱本地模型用 xml） | 8k |
+| LM Studio | 本地 | 需要 | xml（若模型支持也可 native） | 128k（根据模型配置） |
+| Kimi | 云端（Anthropic 端点） | 不需要 | native | 提供商定义 |
+| DeepSeek | 云端（Anthropic 端点） | 不需要 | native | 提供商定义 |
+| GLM | 云端（Anthropic 端点） | 不需要 | native | 提供商定义 |
+| MiniMax | 云端（Anthropic 端点） | 不需要 | native | 提供商定义 |
+| 火山引擎 ARK | 云端（Anthropic 端点） | 不需要 | native | 提供商定义 |
+| 阿里云百炼 | 云端（Anthropic 端点） | 不需要 | native | 提供商定义 |
+| 自定义 OpenAI-compatible | 取决于端点 | 通常需要 | native/xml 视模型能力 | 端点定义 |
+
 ## 日志输出说明
 
 适配器使用结构化日志，典型格式如下：

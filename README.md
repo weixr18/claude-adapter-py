@@ -62,7 +62,7 @@ The CLI starts with provider selection. You will see three categories plus navig
 ```
 ? Choose provider type 选择提供商类型:
   Free    NVIDIA, Ollama, LM Studio
-  Paid    Kimi, DeepSeek, GLM, MiniMax, 火山引擎 ARK
+  Paid    Kimi, DeepSeek, GLM, MiniMax, 火山引擎 ARK, 阿里云百炼
   Custom  OpenAI-compatible endpoint
   Go back  返回重新选择
   Exit  退出
@@ -344,6 +344,7 @@ Injects XML tool instructions into the system prompt. Models output `<tool_code>
 | DeepSeek | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
 | GLM | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
 | MiniMax | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
+| 火山引擎 ARK | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
 | 阿里云百炼 | Cloud (Anthropic endpoint) | Not required | native | provider-defined |
 | Custom OpenAI-compatible | Depends on endpoint | Usually required for Claude Code integration | native/xml by model capability | endpoint-defined |
 

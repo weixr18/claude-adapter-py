@@ -3,14 +3,13 @@
 ## 安装
 
 ```bash
-# 进入项目目录
-cd /data/sharedata/xuyan/LLMs/claudecode/claude-adapter-py
-
-# 安装项目（可编辑模式）
-python3 -m pip install -e .
+# 从源码安装
+git clone <repo-url>
+cd claude-adapter-py
+pip install -e .
 
 # 或安装到用户目录
-python3 -m pip install --user -e .
+pip install --user -e .
 ```
 
 ## 首次运行
@@ -25,11 +24,7 @@ python3 -m claude_adapter
 
 ## 配置示例
 
-### 1. 使用 Ollama（本地）
-
-```bash
-claude-adapter-py
-```
+### 1. 使用 Ollama（免费，本地）
 
 选择 **Ollama**，然后：
 - Base URL: `http://localhost:11434/v1` (默认)
@@ -53,7 +48,7 @@ ollama pull qwen2.5-coder:7b
 ollama serve
 ```
 
-### 2. 使用 LM Studio（本地）
+### 2. 使用 LM Studio（免费，本地）
 
 选择 **LM Studio**，然后：
 - Base URL: `http://localhost:1234/v1` (默认)
@@ -67,7 +62,7 @@ ollama serve
 3. 点击 "Start Server"
 4. **重要**：在设置中将 Context Length 增加到至少 16384
 
-### 3. 使用 NVIDIA NIM（云端）
+### 3. 使用 NVIDIA NIM（免费，云端）
 
 选择 **NVIDIA NIM**，然后：
 - API Key: 从 https://build.nvidia.com/ 获取
@@ -75,40 +70,61 @@ ollama serve
 - Tool Format: **Native**
 - Port: 3080
 
-### 4. 使用 Kimi（云端）
+### 4. 使用 Kimi（付费，云端）
 
 选择 **Kimi (Moonshot)**，然后：
 - API Key: 从 https://platform.moonshot.cn/ 获取
-- Base URL: `https://api.moonshot.cn/v1` (默认)
-- Tool Format: **Native**
-- Port: 3080
+- 推荐模型: `kimi-k2.5`
+- 配置完成后直接使用 Claude Code，无需启动 HTTP 服务器
+
+### 5. 使用火山引擎 ARK（付费，云端）
+
+选择 **火山引擎 ARK (CodingPlan)**，然后：
+- API Key: 从 https://ark.cn-beijing.volces.com/api/coding 获取
+- 选择要使用的模型
+- 配置完成后直接使用 Claude Code，无需启动 HTTP 服务器
+
+### 6. 使用阿里云百炼（付费，云端）
+
+选择 **阿里云百炼 (Qwen)**，然后：
+- API Key: 从 https://bailian.console.aliyun.com/ 获取
+- 推荐模型:
+  - `qwen3.6-plus` — 复杂推理、代码生成
+  - `qwen3.5-flash` — 快速响应、简单任务
+- 配置完成后直接使用 Claude Code，无需启动 HTTP 服务器
 
 ## 配置完成后
 
-适配器会：
-1. 启动 HTTP 服务器在 `http://127.0.0.1:3080`
+**免费提供商**（NVIDIA NIM、Ollama、LM Studio）：
+1. 适配器会启动 HTTP 服务器在 `http://127.0.0.1:3080`
 2. 自动更新 `~/.claude/settings.json`
 3. 保存配置到 `~/.claude-adapter/providers/<provider>.json`
 
-现在就可以使用 Claude Code 了！
+**付费提供商**（Kimi、DeepSeek、GLM、MiniMax、火山引擎 ARK、阿里云百炼）：
+1. 自动更新 `~/.claude/settings.json`，直接配置 Anthropic API 端点
+2. 保存配置到 `~/.claude-adapter/providers/<provider>.json`
+3. 无需启动 HTTP 服务器，直接使用 Claude Code 即可
 
 ## 常用命令
 
 ```bash
-# 切换提供商
-claude-adapter-py --switch
+# 启动适配器（交互式选择提供商）
+claude-adapter-py
 
-# 重新配置当前提供商
-claude-adapter-py --reconfigure
+# 强制重新配置当前提供商
+claude-adapter-py -r
+
+# 自定义端口
+claude-adapter-py -p 8080
 
 # 列出已保存的提供商
-claude-adapter-py list-providers
+claude-adapter-py ls
 
 # 删除提供商配置
-claude-adapter-py remove ollama
+claude-adapter-py rm <provider-name>
 
-# 使用自定义端口
-claude-adapter-py --port 8080
+# 查看帮助
+claude-adapter-py -h
 ```
 
 ## 测试安装
@@ -183,5 +199,3 @@ cat ~/.claude-adapter/providers/ollama.json
 - 查看英文文档：[README.md](README.md)
 - 运行测试：`pytest`
 - 贡献代码：Fork 并提交 PR
-
-祝使用愉快！🎉
