@@ -313,6 +313,7 @@ def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset
     ui.hint(f"API Key 已保存到 ~/.claude/settings.json")
     print()
 
+    set_active_provider(provider_name)
     return True
 
 
@@ -719,6 +720,7 @@ def main(
                         ui.info(f"Sonnet -> {selected_sonnet}")
                         ui.info(f"Haiku  -> {selected_haiku}")
                         ui.info("无需启动 HTTP 服务器，直接使用 Claude Code 即可")
+                        set_active_provider(provider_name_str)
                     except Exception as e:
                         ui.error("Failed to save settings", str(e))
                     raise typer.Exit(0)

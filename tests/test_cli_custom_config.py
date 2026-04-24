@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import questionary
 
 
 def test_configure_custom_does_not_pass_none_default_to_password(monkeypatch):
@@ -16,6 +17,8 @@ def test_configure_custom_does_not_pass_none_default_to_password(monkeypatch):
             return self._value
 
     class _FakeQuestionary:
+        Choice = questionary.Choice
+
         @staticmethod
         def password(message, default=None):
             # Regression assertion: default must be string, not None
