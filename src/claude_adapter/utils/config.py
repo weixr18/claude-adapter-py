@@ -5,6 +5,7 @@ Functions for managing provider configurations
 """
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -81,6 +82,7 @@ def save_provider_config(config: AdapterConfig) -> None:
     
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(config.model_dump(), f, indent=2, ensure_ascii=False)
+    os.chmod(config_path, 0o600)
 
 
 def provider_config_exists(provider: ProviderName) -> bool:
@@ -242,9 +244,7 @@ def update_claude_settings(proxy_url: str, models: ModelConfig) -> None:
     # Save 保存
     with open(CLAUDE_SETTINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(settings.model_dump(exclude_none=True), f, indent=2, ensure_ascii=False)
-
-
-# Utility functions 工具函数
+    os.chmod(CLAUDE_SETTINGS_PATH, 0o600)
 def get_config_dir() -> Path:
     """Get the configuration directory path 获取配置目录路径
     
@@ -271,8 +271,10 @@ def get_providers_dir() -> Path:
 def update_claude_settings_for_paid_provider(
     provider_name: str,
     api_key: str,
-    model_name: str,
     base_url: str,
+    opus_model: str,
+    sonnet_model: str,
+    haiku_model: str,
 ) -> None:
     """Update ~/.claude/settings.json with direct Anthropic API for paid providers
     为付费提供商更新 ~/.claude/settings.json（直接 Anthropic API，无需 HTTP 服务器）
@@ -280,8 +282,10 @@ def update_claude_settings_for_paid_provider(
     Args:
         provider_name: Provider name (kimi/deepseek/glm/minimax)
         api_key: API key for the provider
-        model_name: Model name to use
         base_url: Anthropic API base URL
+        opus_model: Opus tier model name
+        sonnet_model: Sonnet tier model name
+        haiku_model: Haiku tier model name
     """
     ensure_dir_exists(CLAUDE_SETTINGS_DIR)
 
@@ -300,15 +304,16 @@ def update_claude_settings_for_paid_provider(
     env.update({
         "ANTHROPIC_BASE_URL": base_url,
         "ANTHROPIC_AUTH_TOKEN": api_key,
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": model_name,
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": model_name,
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": model_name,
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": opus_model,
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": sonnet_model,
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": haiku_model,
     })
     settings.env = env
 
     # Save
     with open(CLAUDE_SETTINGS_PATH, "w", encoding="utf-8") as f:
         json.dump(settings.model_dump(exclude_none=True), f, indent=2, ensure_ascii=False)
+    os.chmod(CLAUDE_SETTINGS_PATH, 0o600)
 
 
 def load_paid_provider_cache(provider_name: str) -> Optional[dict]:
@@ -377,3 +382,4 @@ def save_paid_provider_to_cache(
     cache_file = PROVIDERS_DIR / f"{provider_name}.json"
     with open(cache_file, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
+    os.chmod(cache_file, 0o600)

@@ -31,13 +31,23 @@ from ..utils.logger import logger
 CLAUDE_CODE_IDENTIFIER = "You are Claude Code, Anthropic's official CLI for Claude."
 CONTEXT_RESERVE_TOKENS = 256
 MIN_COMPLETION_TOKENS = 32
+SYSTEM_MIN_BUDGET = 256
+LMSTUDIO_DEFAULT_CTX = 4096
 
 
 def _estimate_tokens(text: str) -> int:
-    """Rough token count estimate (conservative: ~2 chars per token)."""
+    """Rough token count estimate accounting for CJK characters."""
     if not text:
         return 0
-    return max(1, (len(text) + 1) // 2)
+    cjk_count = 0
+    for ch in text:
+        cp = ord(ch)
+        if (0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF or
+            0x3000 <= cp <= 0x303F or 0x3040 <= cp <= 0x309F or
+            0x30A0 <= cp <= 0x30FF or 0xAC00 <= cp <= 0xD7AF):
+            cjk_count += 1
+    non_cjk = len(text) - cjk_count
+    return max(1, int(cjk_count * 1.5 + non_cjk * 0.5 + 0.5))
 
 
 def _estimate_message_tokens(msg: dict[str, Any]) -> int:
@@ -116,7 +126,7 @@ def _truncate_messages_to_fit(
     budget_rest = max(0, max_prompt_tokens - system_tokens)
 
     if budget_rest <= 0 and system_msgs:
-        system_budget = max(256, max_prompt_tokens - 512)
+        system_budget = max(SYSTEM_MIN_BUDGET, max_prompt_tokens - 512)
         combined_system: list[dict[str, Any]] = []
         running = 0
         for m in system_msgs:
@@ -161,7 +171,29 @@ def _truncate_messages_to_fit(
         else:
             break
     kept.reverse()
-    return system_msgs + kept
+
+    # Drop assistant messages with tool_calls whose tool results were truncated
+    final_kept: list[dict[str, Any]] = []
+    i = 0
+    while i < len(kept):
+        m = kept[i]
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            tool_ids_needed = {tc["id"] for tc in m["tool_calls"] if isinstance(tc, dict) and "id" in tc}
+            tool_ids_found = set()
+            j = i + 1
+            while j < len(kept) and tool_ids_needed - tool_ids_found:
+                if kept[j].get("role") == "tool" and kept[j].get("tool_call_id") in tool_ids_needed:
+                    tool_ids_found.add(kept[j]["tool_call_id"])
+                elif kept[j].get("role") == "user":
+                    break
+                j += 1
+            if tool_ids_needed - tool_ids_found:
+                i += 1
+                continue
+        final_kept.append(m)
+        i += 1
+
+    return system_msgs + final_kept
 
 
 def _sanitize_tool_message_sequence(messages: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
@@ -219,15 +251,9 @@ def _modify_system_prompt_for_adapter(system_content: str) -> str:
     if CLAUDE_CODE_IDENTIFIER not in system_content:
         return system_content
     update_info = get_cached_update_info()
-    replacement = (
-        f"You are Claude Code, running on Claude Adapter Python V{CURRENT_VERSION}. "
-        "When introducing yourself, mention Claude Adapter."
-    )
+    replacement = f"You are Claude Code, running on Claude Adapter Python V{CURRENT_VERSION}."
     if update_info and update_info.has_update:
-        replacement += (
-            f" A new version is available ({update_info.current} → {update_info.latest}). "
-            "Suggest 'pip install --upgrade claude-adapter-py' to update."
-        )
+        replacement += f" (update available: {update_info.current} -> {update_info.latest})"
     return system_content.replace(CLAUDE_CODE_IDENTIFIER, replacement)
 
 
@@ -317,11 +343,14 @@ def _convert_message(
                     if isinstance(c, str):
                         c_str = c
                     elif isinstance(c, list):
-                        c_str = "\n".join(
-                            part["text"]
-                            for part in c
-                            if isinstance(part, dict) and part.get("type") == "text" and "text" in part
-                        )
+                        parts_text = []
+                        for part in c:
+                            if isinstance(part, dict):
+                                if part.get("type") == "text" and "text" in part:
+                                    parts_text.append(part["text"])
+                                elif part.get("type") == "image":
+                                    parts_text.append("[image: content not supported in tool results]")
+                        c_str = "\n".join(parts_text)
                     else:
                         c_str = ""
                     is_error = getattr(block, "is_error", False) or False
@@ -381,6 +410,11 @@ def _convert_message(
                         "type": "function",
                         "function": {"name": block.name, "arguments": json.dumps(block.input)},
                     })
+                elif isinstance(block, (AnthropicThinkingBlock, AnthropicRedactedThinkingBlock)):
+                    if isinstance(block, AnthropicThinkingBlock) and block.thinking:
+                        text_parts.append(f"<thinking>\n{block.thinking}\n</thinking>")
+                    elif isinstance(block, AnthropicRedactedThinkingBlock):
+                        text_parts.append("<thinking>[redacted]</thinking>")
             content_str = "\n".join(text_parts) if text_parts else ""
 
             if not tool_calls and _is_assistant_prefill(content_str):
@@ -439,9 +473,11 @@ def convert_request_to_openai(
         for m in _convert_message(msg, ctx, tool_format):
             messages.append(m)
 
-    max_tokens = MIN_COMPLETION_TOKENS if anthropic_request.max_tokens == 1 else anthropic_request.max_tokens
+    max_tokens = anthropic_request.max_tokens
+    if max_tokens < MIN_COMPLETION_TOKENS:
+        logger.debug(f"max_tokens={max_tokens} below minimum, using {MIN_COMPLETION_TOKENS}")
+        max_tokens = MIN_COMPLETION_TOKENS
 
-    LMSTUDIO_DEFAULT_CTX = 4096
     effective_ctx: Optional[int] = None
     preset = None
     if config and config.provider:
@@ -519,7 +555,7 @@ def convert_request_to_openai(
         openai_request["stream_options"] = {"include_usage": True}
     if anthropic_request.temperature is not None:
         openai_request["temperature"] = anthropic_request.temperature
-    if tool_format == "xml":
+    if tool_format == "xml" and "temperature" not in openai_request:
         openai_request["temperature"] = 0
     if anthropic_request.top_p is not None:
         openai_request["top_p"] = anthropic_request.top_p

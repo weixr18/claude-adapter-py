@@ -8,6 +8,7 @@ import json
 import secrets
 import asyncio
 import os
+import random
 import time
 from typing import Any, Optional
 from fastapi import Request
@@ -117,7 +118,7 @@ async def _create_stream_with_retry(
             status_code = _extract_status_code(e)
             if status_code in _NON_RECOVERABLE_STREAM_START_STATUS or attempt >= retries:
                 raise
-            backoff_s = 0.6 * (attempt + 1)
+            backoff_s = min(5.0, 0.3 * (2 ** attempt)) * (0.5 + random.random())
             req_logger.warn(
                 "Stream start failed, retrying",
                 {
@@ -137,7 +138,7 @@ def _get_openai_client(config: AdapterConfig) -> AsyncOpenAI:
     Reuses the same client as long as base_url and api_key don't change.
     """
     global _cached_client, _cached_client_key
-    key = (config.base_url, config.api_key)
+    key = (config.base_url, config.api_key, config.provider)
     if _cached_client is not None and _cached_client_key == key:
         return _cached_client
 
@@ -349,20 +350,15 @@ async def handle_messages_request(
         model_config = config.models
 
         # Map Claude model names to actual models 将 Claude 模型名称映射到实际模型
-        model_mapping = {
-            "claude-opus-4-20250514": model_config.opus,
-            "claude-opus-4": model_config.opus,
-            "claude-3-5-sonnet-20241022": model_config.sonnet,
-            "claude-3-5-sonnet": model_config.sonnet,
-            "claude-sonnet-4-20250514": model_config.sonnet,
-            "claude-sonnet-4": model_config.sonnet,
-            "claude-3-5-haiku-20241022": model_config.haiku,
-            "claude-3-5-haiku": model_config.haiku,
-            "claude-haiku-4-20250514": model_config.haiku,
-            "claude-haiku-4": model_config.haiku,
-        }
-
-        target_model = model_mapping.get(requested_model, requested_model)
+        _lower = requested_model.lower()
+        if "opus" in _lower:
+            target_model = model_config.opus
+        elif "sonnet" in _lower:
+            target_model = model_config.sonnet
+        elif "haiku" in _lower:
+            target_model = model_config.haiku
+        else:
+            target_model = requested_model
 
         # Convert request 转换请求
         openai_request = convert_request_to_openai(

@@ -110,13 +110,17 @@ def _select_provider() -> Union[Optional[ProviderName], str]:
         questionary.Choice("Exit  退出", value=EXIT),
     ]
 
-    category = questionary.select(
-        "Choose provider type 选择提供商类型:",
-        choices=category_choices,
-    ).ask()
+    while True:
+        category = questionary.select(
+            "Choose provider type 选择提供商类型:",
+            choices=category_choices,
+        ).ask()
 
-    if not category or category == EXIT or category == BACK:
-        return None
+        if not category or category == EXIT:
+            return None
+        if category == BACK:
+            continue
+        break
 
     # ── Provider selection within category 分类内选择提供商 ──
     providers = get_providers_by_category(category)
@@ -192,9 +196,10 @@ def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset
                 api_key = cached["api_key"]
                 # Ask whether to use cached model or enter new model
                 print()
-                cached_opus = cached.get("opus_model") or preset.default_models.opus
-                cached_sonnet = cached.get("sonnet_model") or preset.default_models.sonnet
-                cached_haiku = cached.get("haiku_model") or preset.default_models.haiku
+                _default_models = cached.get("default_models") or {}
+                cached_opus = _default_models.get("opus") or cached.get("opus_model") or preset.default_models.opus
+                cached_sonnet = _default_models.get("sonnet") or cached.get("sonnet_model") or preset.default_models.sonnet
+                cached_haiku = _default_models.get("haiku") or cached.get("haiku_model") or preset.default_models.haiku
                 ui.info(f"Cached models 缓存的模型:")
                 print(f"  Opus   -> {cached_opus}")
                 print(f"  Sonnet -> {cached_sonnet}")
@@ -221,7 +226,7 @@ def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset
                 elif model_action == BACK:
                     return False
                 else:
-                    sys.exit(0)
+                    raise typer.Exit(0)
             elif action == "reconfig":
                 # Force reconfigure without checking cache
                 if not _configure_paid_provider(provider_name, preset, force_reconfig=True):
@@ -249,20 +254,29 @@ def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset
         print()
         ui.info("Model mappings 模型映射, press Enter to use defaults 回车使用默认值:")
 
-        opus_model = questionary.text(
+        opus_input = questionary.text(
             "  Claude Opus   -> ",
             default=preset.default_models.opus,
-        ).ask() or preset.default_models.opus
+        ).ask()
+        if opus_input is None:
+            return False
+        opus_model = opus_input or preset.default_models.opus
 
-        sonnet_model = questionary.text(
+        sonnet_input = questionary.text(
             "  Claude Sonnet -> ",
             default=preset.default_models.sonnet,
-        ).ask() or preset.default_models.sonnet
+        ).ask()
+        if sonnet_input is None:
+            return False
+        sonnet_model = sonnet_input or preset.default_models.sonnet
 
-        haiku_model = questionary.text(
+        haiku_input = questionary.text(
             "  Claude Haiku  -> ",
             default=preset.default_models.haiku,
-        ).ask() or preset.default_models.haiku
+        ).ask()
+        if haiku_input is None:
+            return False
+        haiku_model = haiku_input or preset.default_models.haiku
 
     # Configure and write to ~/.claude/settings.json (use opus model as default)
     try:
@@ -270,8 +284,10 @@ def _configure_paid_provider(provider_name: ProviderName, preset: ProviderPreset
         update_claude_settings_for_paid_provider(
             provider_name=provider_name,
             api_key=api_key.strip(),
-            model_name=opus_model,
             base_url=preset.base_url,
+            opus_model=opus_model,
+            sonnet_model=sonnet_model,
+            haiku_model=haiku_model,
         )
     except Exception as e:
         ui.error("Failed to update Claude settings", str(e))
@@ -377,12 +393,13 @@ def _configure_free_provider(
         base_url = preset.base_url
     else:
         default_url = existing.base_url if existing else preset.base_url
-        base_url = questionary.text(
+        base_url_input = questionary.text(
             "Base URL:",
             default=default_url,
         ).ask()
-        if not base_url:
-            base_url = preset.base_url
+        if base_url_input is None:
+            return None
+        base_url = base_url_input or preset.base_url
 
     # ── Server port ──
     default_port = str(existing.port) if existing and existing.port else "3080"
@@ -390,7 +407,9 @@ def _configure_free_provider(
         "Server port 服务端口:",
         default=default_port,
     ).ask()
-    port = int(port_str) if port_str and port_str.isdigit() else 3080
+    if port_str is None:
+        return None
+    port = int(port_str) if port_str.isdigit() else 3080
 
     # ── Model mappings ──
     ui.info("Model mappings 模型映射, press Enter to use defaults 回车使用默认值:")
@@ -399,20 +418,29 @@ def _configure_free_provider(
     def_sonnet = existing.models.sonnet if existing else preset.default_models.sonnet
     def_haiku = existing.models.haiku if existing else preset.default_models.haiku
 
-    opus_model = questionary.text(
+    opus_input = questionary.text(
         "  Claude Opus   -> ",
         default=def_opus,
-    ).ask() or def_opus
+    ).ask()
+    if opus_input is None:
+        return None
+    opus_model = opus_input or def_opus
 
-    sonnet_model = questionary.text(
+    sonnet_input = questionary.text(
         "  Claude Sonnet -> ",
         default=def_sonnet,
-    ).ask() or def_sonnet
+    ).ask()
+    if sonnet_input is None:
+        return None
+    sonnet_model = sonnet_input or def_sonnet
 
-    haiku_model = questionary.text(
+    haiku_input = questionary.text(
         "  Claude Haiku  -> ",
         default=def_haiku,
-    ).ask() or def_haiku
+    ).ask()
+    if haiku_input is None:
+        return None
+    haiku_model = haiku_input or def_haiku
 
     # ── Tool format ──
     native_choice = questionary.Choice("native  function calling", value="native")
@@ -600,9 +628,10 @@ def main(
                 if action == "use":
                     # Ask whether to use cached model or enter new model
                     print()
-                    cached_opus = cached.get("opus_model") or preset.default_models.opus
-                    cached_sonnet = cached.get("sonnet_model") or preset.default_models.sonnet
-                    cached_haiku = cached.get("haiku_model") or preset.default_models.haiku
+                    _default_models = cached.get("default_models") or {}
+                    cached_opus = _default_models.get("opus") or cached.get("opus_model") or preset.default_models.opus
+                    cached_sonnet = _default_models.get("sonnet") or cached.get("sonnet_model") or preset.default_models.sonnet
+                    cached_haiku = _default_models.get("haiku") or cached.get("haiku_model") or preset.default_models.haiku
                     ui.info(f"Cached models 缓存的模型:")
                     print(f"  Opus   -> {cached_opus}")
                     print(f"  Sonnet -> {cached_sonnet}")
@@ -619,23 +648,39 @@ def main(
                     ).ask()
 
                     if model_action == "use_cached":
-                        selected_model = cached_opus
+                        selected_opus = cached_opus
+                        selected_sonnet = cached_sonnet
+                        selected_haiku = cached_haiku
                     elif model_action == "enter_new":
                         print()
                         ui.info("Model mappings 模型映射, press Enter to use defaults 回车使用默认值:")
-                        opus_model = questionary.text(
+                        opus_input = questionary.text(
                             "  Claude Opus   -> ",
                             default=preset.default_models.opus,
-                        ).ask() or preset.default_models.opus
-                        sonnet_model = questionary.text(
+                        ).ask()
+                        if opus_input is None:
+                            continue
+                        opus_model = opus_input or preset.default_models.opus
+
+                        sonnet_input = questionary.text(
                             "  Claude Sonnet -> ",
                             default=preset.default_models.sonnet,
-                        ).ask() or preset.default_models.sonnet
-                        haiku_model = questionary.text(
+                        ).ask()
+                        if sonnet_input is None:
+                            continue
+                        sonnet_model = sonnet_input or preset.default_models.sonnet
+
+                        haiku_input = questionary.text(
                             "  Claude Haiku  -> ",
                             default=preset.default_models.haiku,
-                        ).ask() or preset.default_models.haiku
-                        selected_model = opus_model
+                        ).ask()
+                        if haiku_input is None:
+                            continue
+                        haiku_model = haiku_input or preset.default_models.haiku
+
+                        selected_opus = opus_model
+                        selected_sonnet = sonnet_model
+                        selected_haiku = haiku_model
 
                         # Save new models to cache
                         try:
@@ -660,20 +705,25 @@ def main(
                         update_claude_settings_for_paid_provider(
                             provider_name=provider_name_str,
                             api_key=cached["api_key"],
-                            model_name=selected_model,
                             base_url=cached.get("base_url", preset.base_url),
+                            opus_model=selected_opus,
+                            sonnet_model=selected_sonnet,
+                            haiku_model=selected_haiku,
                         )
                         print()
                         ui.success(f"{preset.label} configured from cache!")
-                        ui.info(f"Model 模型: {selected_model}")
+                        ui.info(f"Opus   -> {selected_opus}")
+                        ui.info(f"Sonnet -> {selected_sonnet}")
+                        ui.info(f"Haiku  -> {selected_haiku}")
                         ui.info("无需启动 HTTP 服务器，直接使用 Claude Code 即可")
                     except Exception as e:
                         ui.error("Failed to save settings", str(e))
                     raise typer.Exit(0)
 
                 if action == "reconfig":
-                    _configure_paid_provider(provider_name_str, preset)
-                    raise typer.Exit(0)
+                    if _configure_paid_provider(provider_name_str, preset):
+                        raise typer.Exit(0)
+                    continue
 
                 if action == BACK:
                     continue
@@ -876,10 +926,10 @@ def cli_main() -> None:
     except KeyboardInterrupt:
         print()
         ui.info("Cancelled")
-        sys.exit(0)
+        raise typer.Exit(0)
     except Exception as e:
         ui.error("Unexpected error", e)
-        sys.exit(1)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

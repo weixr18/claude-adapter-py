@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -95,7 +95,7 @@ def find_available_port(start_port: int, max_attempts: int = 10) -> int:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            sock.bind(("0.0.0.0", port))
+            sock.bind(("127.0.0.1", port))
             sock.close()
             return port
         except OSError:
@@ -127,7 +127,7 @@ async def run_server(config: AdapterConfig, port: Optional[int] = None) -> None:
 
     uvicorn_config = uvicorn.Config(
         app,
-        host="0.0.0.0",
+        host="127.0.0.1",
         port=server_port,
         log_level="warning",
     )
